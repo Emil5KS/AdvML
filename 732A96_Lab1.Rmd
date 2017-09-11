@@ -1,0 +1,114 @@
+---
+title: "732A96 Lab 1"
+author: "Emil K Svensson"
+date: "`r Sys.Date()`"
+output: pdf_document
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+```
+# Question 1 
+
+```{r}
+library(bnlearn)
+library(gRain)
+
+myasia <- asia
+myalarm <- alarm
+
+sapply(1:10, FUN = function(X) {
+set.seed(X)
+myFirstHc<- hc(myalarm, score = "bde", restart = 5)
+myFirstHc2<- hc(myalarm, score = "bde",restart = 5)
+
+cp1 <- cpdag(myFirstHc)
+cp2 <- cpdag(myFirstHc2)
+all.equal(cp1,cp2)
+}) 
+
+#all.equal(cp1,cp2)
+
+# score(myFirstHc, myalarm)
+# 
+# v1 <- vstructs(myFirstHc)
+# v2 <- vstructs(myFirstHc2)
+# 
+# all.equal(v1,v2)
+
+#graphviz.compare(myFirstHc,myFirstHc2)
+#cpdag(myFirstHc)
+
+# plot
+# arcs
+# vstructs
+# cpdag
+# all.equal
+```
+
+# Assignment 2 
+
+```{r}
+
+
+noArcs<- sapply(c(seq(10,500,10)), FUN = function(X){ 
+  nrow(hc(myalarm, score = "bde",iss = X)$arcs)
+  })
+
+plot(y=noArcs,x = c(seq(10,500,10)))
+```
+In the plot above we can see that the number of arcs are increasing with the increased imaginary sample size. This is because we put more weight on the prior probabilities in the BDeu score. This impacts the posterior in a way that the number of edgeds are increased when we increase the imaginary sample size.
+
+# Assignment 3
+
+```{r}
+HCasia<- hc(myasia,score = "bde")
+bnMFH<-bn.fit(HCasia,myasia)
+gMFH<- as.grain(bnMFH)
+cMFH<- (gMFH) 
+
+
+querygrain(setEvidence(cMFH, c("E","X"), list(c(0.5,0.5), "yes")))
+querygrain(setEvidence(cMFH, c("E"), list(c(0.95,0.05))))
+
+#The same in two ways
+querygrain(setEvidence(cMFH, c("A","X"), list(c(1,0), "yes")))
+#querygrain(setEvidence(cMFH, evidence=list("A" = c(1, 0), "X"="yes")))
+
+
+cpquery(bnMFH)
+# Nu ska du bara querya den
+
+
+# exactFit <- grain(cMFH, myasia)
+# dag()
+# fast.iamb()
+# iamb
+```
+
+
+# Assignment 4 
+
+```{r}
+nograph <- 5000
+nodes <- letters[1:5]
+burn <- c(100,1000,10000)
+evr  <- c(50,150,300)
+cbind(burn,evr)
+
+result <- apply(cbind(burn,evr), MARGIN = 1, FUN = function(X) {
+
+setofgraphs <-  random.graph(nodes, num = nograph, method ="ic-dag",
+                             burn.in = X[1], every = X[2])
+
+EssGraphs <- lapply(setofgraphs,FUN = cpdag)
+
+length(unique(EssGraphs))
+
+} 
+)
+
+result/nograph
+```
+
+
