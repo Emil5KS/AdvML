@@ -1,0 +1,213 @@
+---
+title: "732A96 Lab 2"
+author: "Emil K Svensson"
+date: "14 September 2017"
+output: pdf_document
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+library(ggplot2)
+library(entropy)
+library(HMM)
+```
+
+# Question 1 
+
+```{r}
+states <- paste("z",1:10,sep = "")
+symbols <- paste("s",1:10,sep = "")
+start <- rep(0.1,10)
+
+#Just to see the structure
+#initHMM(states, symbols)
+
+# The transition probabilities, since we only can move 
+trans <- matrix(0,ncol = 10, nrow = 10)
+diag(trans) <- 0.5
+diag(trans[,-1]) <- 0.5
+trans[10,1] <- 0.5 
+#trans[1,10] <- 0.5
+
+# Making sure the probabilities sum to 1 in each row
+#apply(trans, MARGIN = 1, FUN = sum)
+
+emission <- matrix(0,ncol = 10, nrow = 10)
+diag(emission) <- 0.5
+
+# The Emission probabilities are our uncertaintiec in the position of the robot.
+
+# Brute force set up, Nick, Rasmus and Sascha probably has a nicer ways of solving this 
+diag(emission[,-1]) <- 0.2 
+diag(emission[-1,]) <- 0.2 
+diag(emission[c(-1:-2),]) <- 0.2
+diag(emission[,c(-1:-2)]) <- 0.2 
+emission[10,2] <- 0.2
+emission[2,10] <- 0.2
+emission[2,10] <- 0.2
+emission[1,10] <- 0.2
+emission[9:10,1] <- 0.2
+emission[1,9] <- 0.2
+```
+\newpage
+
+```{r}
+
+
+# The different places the robot can be in
+symbols
+
+# The Hidden States  
+states
+
+# Where they start
+start
+
+# Transition matrix is the probabilities the robot will move
+trans
+
+# Emission matrix states the uncertainties we have about the robots position
+emission
+
+```
+With everything defined we can initialize the HMM-robot. 
+
+```{r}
+robot <- initHMM(states,symbols,start,trans,emission)
+
+```
+
+# Question 2
+
+The function below is built for answering Question 2,3,4 and 5
+
+```{r}
+
+mrRobot <- function(hmm,simobs = 100, what = "acc"){
+
+  # Simulation the robot simobs times 
+  sim_rob <- simHMM(hmm,length = simobs)
+  
+  #extract the observations (x_t)
+  observations <- sim_rob$observation
+  
+  #extract the hidden states z_t
+  state_place <- sim_rob$states
+  
+  
+  # Forward function computes the filtering with log
+  log_filter <- forward(hmm = hmm, observation = observations)
+  
+  # Remove the log-transformation
+  filter <- exp(log_filter)
+  
+  # Normalizing
+  norm_filter <-prop.table(filter, margin = 2)
+  
+  # Checking which probability in each column is the highest
+  most_prob_filter <- apply(norm_filter, MARGIN = 2, FUN = which.max)
+  
+  # Accuracy for the filter 
+  accuracy_filter <-  sum(paste("z",most_prob_filter, sep = "") 
+                       == state_place) / length(state_place)
+  
+  # Smoothed (in this package called the posterior)
+  smoothed <- posterior(hmm=hmm,observations)
+  
+  # Normalizing
+  norm_smoothed <-prop.table(smoothed, margin = 2)
+  
+  most_prob_smoothed <- apply(norm_smoothed, MARGIN = 2, FUN = which.max)
+  
+  # Accuracy for the smoothed 
+  accuracy_smoothed <-  sum(paste("z",most_prob_smoothed, sep = "") 
+                            ==  state_place) / length(state_place)
+  
+  #cat("The accuracy of the smoothed is",accuracy_smoothed)
+  
+  
+  # Most probable path (Viterbi)
+  mpp <- viterbi(hmm,observations)
+  
+  accuracy_mpp <-  sum(mpp == state_place) / length(state_place)
+  #cat("The accuracy of the Viterbi is",accuracy_mpp)
+  
+  
+  #Just logical statements on what to return. 
+  if(what == "acc"){
+  return( c(accuracy_filter = accuracy_filter, 
+            accuracy_smoothed = accuracy_smoothed,
+            accuracy_mpp = accuracy_mpp)) 
+  }
+  
+  if(what == "filter"){
+    return(norm_filter)
+  }
+  
+  if(what == "smooth"){
+    return(norm_smoothed)
+  }
+  
+  if(what == "mpp"){
+    return(mpp)
+  }
+
+}
+```
+
+
+## Filter
+```{r, eval = FALSE}
+mrRobot(hmm = robot,simobs = 100, what = "filter")
+```
+To much to print out, so run the code if you want to see the distribution
+## Smoothed
+```{r,eval = FALSE}
+mrRobot(hmm = robot,simobs = 100, what = "smooth")
+
+```
+To much to print out, so run the code if you want to see the distribution
+
+## Most probable path
+```{r}
+mrRobot(hmm = robot,simobs = 100, what = "mpp")
+
+```
+
+
+```{r, cache = TRUE}
+total_acc <- sapply(1:100,FUN = function(x){mrRobot(robot,100, what = "acc")} )
+
+total_acc <- as.data.frame(t(total_acc))
+total_acc$index <- 1:100 
+
+
+ggplot(data = total_acc) + geom_line(aes(x=index,y=accuracy_filter , col = "Filter")) +  geom_line(aes(x=index,y=accuracy_smoothed , col = "Smoothed")) +  geom_line(aes(x=index,y=accuracy_mpp , col = "Mpp"))
+
+
+```
+
+```{r}
+colMeans(total_acc[,-4])
+```
+
+
+## Question 6
+
+```{r}
+
+# filter_data <- sapply(1,FUN = function(x){
+#   mrRobot(robot,100, what = "filter")
+#   })
+
+filter_data <- mrRobot(robot,100, what = "filter")
+filter_entropy <- data.frame(Index = 1:100 ,
+                  Entropy =
+                  apply(filter_data, MARGIN = 2, FUN =entropy.empirical))
+
+ggplot(data = filter_entropy, aes(x = Index, y = Entropy)) + geom_line() + ggtitle("Entropy for filter distribution") + theme_minimal()
+```
+
+## Question 7
+
+???
