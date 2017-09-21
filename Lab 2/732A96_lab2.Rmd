@@ -38,6 +38,7 @@ diag(emission) <- 0.5
 # The Emission probabilities are our uncertaintiec in the position of the robot.
 
 # Brute force set up, Nick, Rasmus and Sascha probably has a nicer ways of solving this 
+diag(emission) <- 0.2
 diag(emission[,-1]) <- 0.2 
 diag(emission[-1,]) <- 0.2 
 diag(emission[c(-1:-2),]) <- 0.2
@@ -188,7 +189,7 @@ total_acc <- as.data.frame(t(total_acc))
 total_acc$index <- 1:100 
 
 
-ggplot(data = total_acc) + geom_line(aes(x=index,y=accuracy_filter , col = "Filter")) +  geom_line(aes(x=index,y=accuracy_smoothed , col = "Smoothed")) +  geom_line(aes(x=index,y=accuracy_mpp , col = "Mpp")) + theme_minimal()
+ggplot(data = total_acc) + geom_line(aes(x=index,y=accuracy_filter , col = "Filter")) +  geom_line(aes(x=index,y=accuracy_smoothed , col = "Smoothed")) +  geom_line(aes(x=index,y=accuracy_mpp , col = "Mpp")) + theme_minimal() +xlab("samples") + ylab("acc of the sample")
 
 
 ```
@@ -220,9 +221,9 @@ No, the entropy remains random even while increasing the number of observations 
 
 ```{r}
 
-prior <- filter_data[,100] # The last information of the robot aka the prior
+posterior <- filter_data[,100] # The last information of the robot aka the prior
 transition <- robot$transProbs
-transition %*% prior 
+transition %*% posterior 
 
 ```
 Since we have a markovian assumption that the only relevant state is the one we are in now and since all previous states feeds forward through z100 and provides it with information about previout observations and states we can just multiply z100 probabilities for each state with the transition probabilities to ge at prediction of how z101 and s101 will be like. In this case we were asked to get the hidden states probabilites but if you want the observation you can just do a argmax over these probabilities to get were the next state should be.
