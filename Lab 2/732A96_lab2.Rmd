@@ -79,7 +79,7 @@ robot <- initHMM(states,symbols,start,trans,emission)
 
 # Question 2
 
-The function below is built for answering Question 2,3,4 and 5
+The function below is built for answering Questions 2 to 7
 
 ```{r}
 
@@ -94,45 +94,49 @@ mrRobot <- function(hmm,simobs = 100, what = "acc"){
   #extract the hidden states z_t
   state_place <- sim_rob$states
   
+### Filter 
+    # Forward function computes the filtering with log
+    log_filter <- forward(hmm = hmm, observation = observations)
+    
+    # Remove the log-transformation
+    filter <- exp(log_filter)
+    
+    # Normalizing
+    norm_filter <-prop.table(filter, margin = 2)
+    
+    # Checking which probability in each column is the highest
+    most_prob_filter <- apply(norm_filter, MARGIN = 2, FUN = which.max)
+    
+    # Accuracy for the filter 
+    accuracy_filter <-  sum(paste("z",most_prob_filter, sep = "") 
+                         == state_place) / length(state_place)
   
-  # Forward function computes the filtering with log
-  log_filter <- forward(hmm = hmm, observation = observations)
-  
-  # Remove the log-transformation
-  filter <- exp(log_filter)
-  
-  # Normalizing
-  norm_filter <-prop.table(filter, margin = 2)
-  
-  # Checking which probability in each column is the highest
-  most_prob_filter <- apply(norm_filter, MARGIN = 2, FUN = which.max)
-  
-  # Accuracy for the filter 
-  accuracy_filter <-  sum(paste("z",most_prob_filter, sep = "") 
-                       == state_place) / length(state_place)
-  
-  # Smoothed (in this package called the posterior)
-  smoothed <- posterior(hmm=hmm,observations)
-  
-  # Normalizing
-  norm_smoothed <-prop.table(smoothed, margin = 2)
-  
-  most_prob_smoothed <- apply(norm_smoothed, MARGIN = 2, FUN = which.max)
-  
-  # Accuracy for the smoothed 
-  accuracy_smoothed <-  sum(paste("z",most_prob_smoothed, sep = "") 
-                            ==  state_place) / length(state_place)
+    
+    
+### Smoothed (in this package called the posterior)
+    smoothed <- posterior(hmm=hmm,observations)
+    
+    # Normalizing
+    norm_smoothed <-prop.table(smoothed, margin = 2)
+    
+    most_prob_smoothed <- apply(norm_smoothed, MARGIN = 2, FUN = which.max)
+    
+    # Accuracy for the smoothed 
+    accuracy_smoothed <-  sum(paste("z",most_prob_smoothed, sep = "") 
+                              ==  state_place) / length(state_place)
   
   #cat("The accuracy of the smoothed is",accuracy_smoothed)
   
   
-  # Most probable path (Viterbi)
-  mpp <- viterbi(hmm,observations)
+### Most probable path (Viterbi)
+    mpp <- viterbi(hmm,observations)
+    
+    accuracy_mpp <-  sum(mpp == state_place) / length(state_place)
+    #cat("The accuracy of the Viterbi is",accuracy_mpp)
   
-  accuracy_mpp <-  sum(mpp == state_place) / length(state_place)
-  #cat("The accuracy of the Viterbi is",accuracy_mpp)
   
-  
+    
+    
   #Just logical statements on what to return. 
   if(what == "acc"){
   return( c(accuracy_filter = accuracy_filter, 
@@ -157,10 +161,12 @@ mrRobot <- function(hmm,simobs = 100, what = "acc"){
 
 
 ## Filter
+
 ```{r, eval = FALSE}
 mrRobot(hmm = robot,simobs = 100, what = "filter")
 ```
 To much to print out, so run the code if you want to see the distribution
+
 ## Smoothed
 ```{r,eval = FALSE}
 mrRobot(hmm = robot,simobs = 100, what = "smooth")
@@ -182,7 +188,7 @@ total_acc <- as.data.frame(t(total_acc))
 total_acc$index <- 1:100 
 
 
-ggplot(data = total_acc) + geom_line(aes(x=index,y=accuracy_filter , col = "Filter")) +  geom_line(aes(x=index,y=accuracy_smoothed , col = "Smoothed")) +  geom_line(aes(x=index,y=accuracy_mpp , col = "Mpp"))
+ggplot(data = total_acc) + geom_line(aes(x=index,y=accuracy_filter , col = "Filter")) +  geom_line(aes(x=index,y=accuracy_smoothed , col = "Smoothed")) +  geom_line(aes(x=index,y=accuracy_mpp , col = "Mpp")) + theme_minimal()
 
 
 ```
@@ -208,6 +214,15 @@ filter_entropy <- data.frame(Index = 1:100 ,
 ggplot(data = filter_entropy, aes(x = Index, y = Entropy)) + geom_line() + ggtitle("Entropy for filter distribution") + theme_minimal()
 ```
 
+No, the entropy remains random even while increasing the number of observations added to the hmm. This is because it is markovian and only depends on the previous observation.
+
 ## Question 7
 
-???
+```{r}
+
+prior <- filter_data[,100] # The last information of the robot aka the prior
+transition <- robot$transProbs
+transition %*% prior 
+
+```
+Since we have a markovian assumption that the only relevant state is the one we are in now and since all previous states feeds forward through z100 and provides it with information about previout observations and states we can just multiply z100 probabilities for each state with the transition probabilities to ge at prediction of how z101 and s101 will be like. In this case we were asked to get the hidden states probabilites but if you want the observation you can just do a argmax over these probabilities to get were the next state should be.
