@@ -113,6 +113,12 @@ gen_data_sd1 <- generate_data(nobs = 100, sd_emission = 1, sd_transition = 1)
 
 est_data_sd1 <- particle_filter(nobs = 100, X = gen_data_sd1$X,
                 sd_emission = 1, sd_transition = 1)
+
+est_data_sd5 <- particle_filter(nobs = 100, X = gen_data_sd1$X,
+                sd_emission = 5, sd_transition = 1)
+
+est_data_sd50 <- particle_filter(nobs = 100, X = gen_data_sd1$X,
+                sd_emission = 50, sd_transition = 1)
 ```
 
 
@@ -185,8 +191,20 @@ Sys.sleep(0.1)
 ```{r}
 plot_robot(img = r2d2, 
            X = gen_data_sd1$X, 
-           Z = est_data_sd1$X,
+           Z = est_data_sd1$Z,
            Wt = est_data_sd1$Wt,
+           off = 0.1)
+
+plot_robot(img = r2d2, 
+           X = gen_data_sd1$X, 
+           Z = est_data_sd5$Z,
+           Wt = est_data_sd5$Wt,
+           off = 0.1)
+
+plot_robot(img = r2d2, 
+           X = gen_data_sd1$X, 
+           Z = est_data_sd50$Z,
+           Wt = est_data_sd50$Wt,
            off = 0.1)
 ```
 
@@ -200,10 +218,10 @@ plot_robot(img = r2d2,
 
 
 
-animation::saveGIF({
-  plot_robot()
-},
-movie.name = "mr_roboto.gif")
+# animation::saveGIF({
+#   plot_robot()
+# },
+# movie.name = "mr_roboto.gif")
 
 
 ```
