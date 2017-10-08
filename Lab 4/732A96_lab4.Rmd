@@ -1,0 +1,152 @@
+---
+title: "732A96 Lab 4"
+author: "Emil K Svensson"
+date: "5 October 2017"
+output: pdf_document
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+```
+
+# The Implementation
+
+```{r}
+set.seed(12345)
+
+
+
+
+sample_emission <- function(z){
+  mean_adjust <- round(runif(1,-1,1))
+  rnorm(1, mean = z + mean_adjust, sd = 1)
+  
+}
+
+sample_transition <- function(z){
+  mean_adjust <- round(runif(1,0,2))
+  rnorm(1, mean = z + mean_adjust, sd = 1)
+}
+
+Time <- 100
+
+X <- rep(NA,Time)
+Z_true <- c(runif(1,0,100),rep(NA,Time-1))
+
+X[1] <- sample_emission(Z_true[1])
+
+for (i in 2:Time){
+  
+  Z_true[i] <- sample_transition(Z_true[i-1])
+  X[i] <- sample_emission(Z_true[i])
+}
+
+
+# Now we discard Z and try to estimate it using only X
+Wt <- matrix(NA,ncol = 100, nrow = 100)
+Z <- matrix(NA, ncol = 100, nrow = 100 + 1)
+Z[1,] <- runif(100, min = 0, max = 100)
+
+for (t in 1:Time){
+
+# Emission model, the probability of the observation x_t given z_t 
+emission <- sapply(Z[t,], function(zt) { 
+  (dnorm(X[t],zt , 1) + dnorm(X[t],zt - 1, 1) + dnorm(X[t],zt + 1, 1)) / 3 
+})
+
+Wt[t,] <- emission / sum(emission)
+
+
+Z_old <- sample(x = Z[t,], size = 100, replace = TRUE, prob = Wt[t,])
+
+Z[t+1,] <- sapply(Z_old, function(x) sample_transition(x))
+
+}
+
+# Calculate the weight Wt[t] for each particle
+# Sample Z[t] particles with the weights
+# Sample Z[t+1] with the sampled Z[t] particles
+
+# Transition model, the probability of the hidden state z_{t+1} given z_t, the uncertainty of the observation z_t
+#
+# transition <- sapply(z1, function(Z){
+#                        (rnorm(1,Z , 1) + 
+#                         rnorm(1,Z + 1, 1) + 
+#                         rnorm(1,Z + 2, 1) ) / 3
+# })
+# 
+# plot( wt * transition) 
+# 
+# wt * transition
+# 
+# #wt %*% transition
+#plot(transition , type = "o")
+
+```
+
+
+```{r}
+library(rgdal)
+library(rasterImage)
+library(png)
+library(animation)
+
+Z <- Z[1:100,1:100]
+
+r2d2 <- readPNG("r2d22.png")
+r2d2 <- as.raster(r2d2) 
+
+rm_z <- rowSums(Wt * Z)
+tru_pos <- data.frame(X = X, y = 0.01)
+C <- coordinates(tru_pos)
+off <- 0.1
+
+plot_robot <- function(){
+
+for (i in 1:length(rm_z)){ 
+plot(x = 1:250, y = rep(0,250),type = "l", ylim = c(-0.6,1) , col = "white" , xlab = "Position x", ylab = "", main = paste("Time :",i))
+abline(h = 0, col = "black") 
+points(x = rm_z[i], y = 0.5, col = "white")
+points(x = Z[i,], y = rep(-0.5,length(Z[i,]))) 
+rasterImage(r2d2,
+            xleft = C[i,1]-off ,
+            ybottom = C[i,2]-off,
+            xright = C[i,1]+off+50,
+            ytop = C[i,2]+off+0.25,
+            interpolate = FALSE)
+points(x = C[i,1], y = -0.1, col = "green")
+points(rm_z[i], y = -0.2, col = "red")
+
+if(i == 1){
+  Sys.sleep(5)
+}
+
+Sys.sleep(0.1)
+}  
+
+} 
+
+#C <- coordinates(data.frame(x = c(4,5), y = c(2,5)))
+
+
+ # plot(C, xlim = c(-5,10), ylim = c(-5,10), col = "white")
+ # rasterImage(r2d2, xleft = c(1,0.5)+2, ybottom = c(1,0.5)-2, xright = c(1,0.5)-2, ytop = c(1,0.5)+2, interpolate = FALSE)
+```
+
+
+```{r}
+# animation::saveHTML({
+#   plot_robot()
+# },
+# movie.name = "my_first_robot.html")
+
+
+
+animation::saveGIF({
+  plot_robot()
+},
+movie.name = "mr_roboto.gif")
+
+
+```
+
