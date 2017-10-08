@@ -17,51 +17,74 @@ set.seed(12345)
 
 
 
-sample_emission <- function(z){
+sample_emission <- function(z, sd = 1){
   mean_adjust <- round(runif(1,-1,1))
-  rnorm(1, mean = z + mean_adjust, sd = 1)
+  rnorm(1, mean = z + mean_adjust, sd = sd)
   
 }
 
-sample_transition <- function(z){
+sample_transition <- function(z, sd = 1){
   mean_adjust <- round(runif(1,0,2))
-  rnorm(1, mean = z + mean_adjust, sd = 1)
+  rnorm(1, mean = z + mean_adjust, sd = sd)
 }
 
-Time <- 100
+#Time <- 100
 
-X <- rep(NA,Time)
-Z_true <- c(runif(1,0,100),rep(NA,Time-1))
+generate_data <- function(nobs, sd_emission = 1, sd_transition = 1){
 
-X[1] <- sample_emission(Z_true[1])
+X <- rep(NA,nobs)
+Z_true <- c(runif(1,0,100),rep(NA,nobs-1))
 
-for (i in 2:Time){
+X[1] <- sample_emission(Z_true[1], sd = sd_emission)
+
+for (i in 2:nobs){
   
-  Z_true[i] <- sample_transition(Z_true[i-1])
-  X[i] <- sample_emission(Z_true[i])
+  Z_true[i] <- sample_transition(Z_true[i-1 ], sd_transition)
+  X[i] <- sample_emission(Z_true[i], sd_emission)
+}
+
+return(list(X = X,
+            Z_true = Z_true,
+            sd_used = c(emission = sd_emission, transition = sd_transition)))
 }
 
 
+particle_filter <- function(nobs,X, sd_emission,sd_transition){
 # Now we discard Z and try to estimate it using only X
-Wt <- matrix(NA,ncol = 100, nrow = 100)
-Z <- matrix(NA, ncol = 100, nrow = 100 + 1)
+Wt <- matrix(NA,ncol = nobs, nrow = nobs)
+Z <- matrix(NA, ncol = nobs, nrow = nobs + 1)
 Z[1,] <- runif(100, min = 0, max = 100)
 
-for (t in 1:Time){
+for (t in 1:nobs){
 
 # Emission model, the probability of the observation x_t given z_t 
 emission <- sapply(Z[t,], function(zt) { 
-  (dnorm(X[t],zt , 1) + dnorm(X[t],zt - 1, 1) + dnorm(X[t],zt + 1, 1)) / 3 
+     (dnorm(X[t],zt , sd_emission) + 
+     dnorm(X[t],zt - 1, sd_emission) + 
+     dnorm(X[t],zt + 1, sd_emission)) / 3 
 })
 
 Wt[t,] <- emission / sum(emission)
 
 
-Z_old <- sample(x = Z[t,], size = 100, replace = TRUE, prob = Wt[t,])
+Z_old <- sample(x = Z[t,], size = nobs, replace = TRUE, prob = Wt[t,])
 
-Z[t+1,] <- sapply(Z_old, function(x) sample_transition(x))
+Z[t+1,] <- sapply(Z_old, function(x) sample_transition(x, sd  = sd_transition))
 
 }
+
+return(list(X = X,
+            Z_est = Z[1:nobs,1:nobs],
+            Wt = Wt)
+)
+
+}
+
+
+
+
+
+
 
 # Calculate the weight Wt[t] for each particle
 # Sample Z[t] particles with the weights
@@ -86,34 +109,60 @@ Z[t+1,] <- sapply(Z_old, function(x) sample_transition(x))
 
 
 ```{r}
+gen_data_sd1 <- generate_data(nobs = 100, sd_emission = 1, sd_transition = 1)
+
+est_data_sd1 <- particle_filter(nobs = 100, X = gen_data_sd1$X,
+                sd_emission = 1, sd_transition = 1)
+```
+
+
+
+```{r}
 library(rgdal)
 library(rasterImage)
 library(png)
 library(animation)
 
-Z <- Z[1:100,1:100]
 
 r2d2 <- readPNG("r2d22.png")
-r2d2 <- as.raster(r2d2) 
 
+#off <- 0.1
+
+#Good advice, dont mess with the off parameter. 
+plot_robot <- function(img,X,Z,Wt, off = 0.1){
+
+# Some preparations before ploting
+  
+# Making the image to a raster object   
+r2d2 <- as.raster(img) 
+
+#Coordinates for the true position of the robot
+C <- coordinates(data.frame(X = X, y = 0.01))
+
+# The Expected position of the robot 
 rm_z <- rowSums(Wt * Z)
-tru_pos <- data.frame(X = X, y = 0.01)
-C <- coordinates(tru_pos)
-off <- 0.1
 
-plot_robot <- function(){
-
+  
 for (i in 1:length(rm_z)){ 
-plot(x = 1:250, y = rep(0,250),type = "l", ylim = c(-0.6,1) , col = "white" , xlab = "Position x", ylab = "", main = paste("Time :",i))
+plot(x = 1:250, y = rep(0,250),
+     type = "l", 
+     col = "white",
+     ylim = c(-0.6,1), 
+     xlab = "Position x",
+     ylab = "", 
+     main = paste("Time :",i))
+  
 abline(h = 0, col = "black") 
 points(x = rm_z[i], y = 0.5, col = "white")
 points(x = Z[i,], y = rep(-0.5,length(Z[i,]))) 
+
 rasterImage(r2d2,
             xleft = C[i,1]-off ,
             ybottom = C[i,2]-off,
             xright = C[i,1]+off+50,
             ytop = C[i,2]+off+0.25,
             interpolate = FALSE)
+
 points(x = C[i,1], y = -0.1, col = "green")
 points(rm_z[i], y = -0.2, col = "red")
 
@@ -132,6 +181,15 @@ Sys.sleep(0.1)
  # plot(C, xlim = c(-5,10), ylim = c(-5,10), col = "white")
  # rasterImage(r2d2, xleft = c(1,0.5)+2, ybottom = c(1,0.5)-2, xright = c(1,0.5)-2, ytop = c(1,0.5)+2, interpolate = FALSE)
 ```
+
+```{r}
+plot_robot(img = r2d2, 
+           X = gen_data_sd1$X, 
+           Z = est_data_sd1$X,
+           Wt = est_data_sd1$Wt,
+           off = 0.1)
+```
+
 
 
 ```{r}
