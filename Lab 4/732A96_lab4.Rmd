@@ -80,33 +80,53 @@ return(list(X = X,
 
 }
 
-
-
-
-
-
-
 # Calculate the weight Wt[t] for each particle
 # Sample Z[t] particles with the weights
 # Sample Z[t+1] with the sampled Z[t] particles
 
 # Transition model, the probability of the hidden state z_{t+1} given z_t, the uncertainty of the observation z_t
-#
-# transition <- sapply(z1, function(Z){
-#                        (rnorm(1,Z , 1) + 
-#                         rnorm(1,Z + 1, 1) + 
-#                         rnorm(1,Z + 2, 1) ) / 3
-# })
-# 
-# plot( wt * transition) 
-# 
-# wt * transition
-# 
-# #wt %*% transition
-#plot(transition , type = "o")
+```
+
+
+# The special case 
+
+```{r}
+
+special_filter <- function(nobs,X, sd_emission,sd_transition){
+# Now we discard Z and try to estimate it using only X
+Wt <- matrix(NA,ncol = nobs, nrow = nobs)
+Z <- matrix(NA, ncol = nobs, nrow = nobs + 1)
+Z[1,] <- runif(100, min = 0, max = 100)
+
+for (t in 1:nobs){
+
+# Emission model, the probability of the observation x_t given z_t 
+emission <- sapply(Z[t,], function(zt) { 
+     (dnorm(X[t],zt , sd_emission) + 
+     dnorm(X[t],zt - 1, sd_emission) + 
+     dnorm(X[t],zt + 1, sd_emission)) / 3 
+})
+
+# All weights are equal in the special case.
+
+Wt[t,] <- rep(1/nobs, nobs)
+
+
+Z_old <- sample(x = Z[t,], size = nobs, replace = TRUE, prob = Wt[t,])
+
+Z[t+1,] <- sapply(Z_old, function(x) sample_transition(x, sd  = sd_transition))
+
+}
+
+return(list(Z_est = Z[1:nobs,1:nobs],
+            Wt = Wt)
+)
+
+}
 
 ```
 
+## Running the functions
 
 ```{r}
 gen_data_sd1 <- generate_data(nobs = 100, sd_emission = 1, sd_transition = 1)
@@ -119,7 +139,11 @@ est_data_sd5 <- particle_filter(nobs = 100, X = gen_data_sd1$X,
 
 est_data_sd50 <- particle_filter(nobs = 100, X = gen_data_sd1$X,
                 sd_emission = 50, sd_transition = 1)
+
+est_data_special <- special_filter(nobs = 100, X = gen_data_sd1$X,
+                sd_emission = 50, sd_transition = 1)
 ```
+
 
 
 
@@ -131,6 +155,7 @@ library(animation)
 
 
 r2d2 <- readPNG("r2d22.png")
+pman <- readPNG("pman.png")
 
 #off <- 0.1
 
@@ -181,14 +206,21 @@ Sys.sleep(0.1)
 
 } 
 
-#C <- coordinates(data.frame(x = c(4,5), y = c(2,5)))
-
-
- # plot(C, xlim = c(-5,10), ylim = c(-5,10), col = "white")
- # rasterImage(r2d2, xleft = c(1,0.5)+2, ybottom = c(1,0.5)-2, xright = c(1,0.5)-2, ytop = c(1,0.5)+2, interpolate = FALSE)
 ```
 
-```{r}
+
+All plots are avaliable [at my GitHub accound](http://example.com) in form of gifs. 
+With a standard deveation of 1 the expected value, represented by the red dot is close to the true position (the green dot) basicly from the begining of the observations.
+
+For the standard deviation equal to 5 we have similar results as for sd of 1 but with a bit more uncertainty and a expected Z that is not always very close to the true state. 
+
+For the standard deviation equal to 50 we have a harder time finding the true state but it is still a good aproximation after a couple of itterations. 
+
+For the special case with equal weights the predictions are useless, but since we basicly only use prior information and never update it. 
+
+
+
+```{r, eval = FALSE}
 plot_robot(img = r2d2, 
            X = gen_data_sd1$X, 
            Z = est_data_sd1$Z,
@@ -206,23 +238,51 @@ plot_robot(img = r2d2,
            Z = est_data_sd50$Z,
            Wt = est_data_sd50$Wt,
            off = 0.1)
+
+plot_robot(img = r2d2, 
+           X = gen_data_sd1$X, 
+           Z = est_data_special$Z,
+           Wt = est_data_special$Wt,
+           off = 0.1)
 ```
 
+```{r, eval = FALSE}
+animation::saveGIF({
+  plot_robot(img = r2d2, 
+           X = gen_data_sd1$X, 
+           Z = est_data_sd1$Z,
+           Wt = est_data_sd1$Wt,
+           off = 0.1)
+},
+movie.name = "robot_sd1.gif")
 
+animation::saveGIF({
+  plot_robot(img = r2d2, 
+           X = gen_data_sd1$X, 
+           Z = est_data_sd5$Z,
+           Wt = est_data_sd5$Wt,
+           off = 0.1)
+},
+movie.name = "robot_sd5.gif")
 
-```{r}
-# animation::saveHTML({
-#   plot_robot()
-# },
-# movie.name = "my_first_robot.html")
+animation::saveGIF({
+  plot_robot(img = r2d2, 
+           X = gen_data_sd1$X, 
+           Z = est_data_sd50$Z,
+           Wt = est_data_sd50$Wt,
+           off = 0.1)
+},
+movie.name = "robot_sd50.gif")
 
-
-
-# animation::saveGIF({
-#   plot_robot()
-# },
-# movie.name = "mr_roboto.gif")
-
+animation::saveGIF({
+  plot_robot(img = r2d2, 
+           X = gen_data_sd1$X, 
+           Z = est_data_special$Z,
+           Wt = est_data_special$Wt,
+           off = 0.1)
+},
+movie.name = "robot_special.gif")
 
 ```
+
 
