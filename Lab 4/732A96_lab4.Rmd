@@ -147,7 +147,7 @@ est_data_special <- special_filter(nobs = 100, X = gen_data_sd1$X,
 
 
 
-```{r}
+```{r, warning = FALSE, message = FALSE}
 library(rgdal)
 library(rasterImage)
 library(png)
@@ -207,18 +207,20 @@ Sys.sleep(0.1)
 } 
 
 ```
+\newpage
 
-
-All plots are avaliable [at my GitHub accound](http://example.com) in form of gifs. 
+All plots are avaliable [at my GitHub repo](https://github.com/Emil5KS/732A96/tree/master/Lab%204/Gifs) in form of gifs. 
 With a standard deveation of 1 the expected value, represented by the red dot is close to the true position (the green dot) basicly from the begining of the observations.
 
 For the standard deviation equal to 5 we have similar results as for sd of 1 but with a bit more uncertainty and a expected Z that is not always very close to the true state. 
 
-For the standard deviation equal to 50 we have a harder time finding the true state but it is still a good aproximation after a couple of itterations. 
+For the standard deviation equal to 50 we have a harder time following the true location but it is still a good aproximation after a couple of itterations. 
 
-For the special case with equal weights the predictions are useless, but since we basicly only use prior information and never update it. 
+For the special case with equal weights the predictions are useless, it is like running another independent robot and will continue doing that since we are not using the information from the emission model in our sampling.
 
+\newpage
 
+# Making/Ploting Gifs 
 
 ```{r, eval = FALSE}
 plot_robot(img = r2d2, 
