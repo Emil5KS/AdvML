@@ -209,7 +209,7 @@ Sys.sleep(0.1)
 ```
 \newpage
 
-All plots are avaliable [at my GitHub repo](https://github.com/Emil5KS/732A96/tree/master/Lab%204/Gifs) in form of gifs. 
+All plots are avaliable at my GitHub [LINK](https://github.com/Emil5KS/732A96/tree/master/Lab%204/Gifs) in form of gifs. 
 With a standard deveation of 1 the expected value, represented by the red dot is close to the true position (the green dot) basicly from the begining of the observations.
 
 For the standard deviation equal to 5 we have similar results as for sd of 1 but with a bit more uncertainty and a expected Z that is not always very close to the true state. 
