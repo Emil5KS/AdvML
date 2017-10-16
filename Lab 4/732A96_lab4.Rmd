@@ -155,7 +155,7 @@ library(animation)
 
 
 r2d2 <- readPNG("r2d22.png")
-pman <- readPNG("pman.png")
+#pman <- readPNG("pman.png")
 
 #off <- 0.1
 

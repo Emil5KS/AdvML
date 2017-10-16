@@ -1,0 +1,295 @@
+---
+title: "BN_networks"
+author: "Emil K Svensson"
+date: "10 October 2017"
+output: html_document
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+```
+
+
+
+```{r cars}
+library(gRain)
+library(bnlearn)
+```
+# bnlearn package
+
+## empty.graph() - Creating Empty Graphs 
+
+```{r}
+
+
+e <- empty.graph(LETTERS[1:6], num = 1)
+
+```
+
+Med empty.graph kan man skapa en tom graf givet ett set av noder som kan vara representerade av olika strängar eller liknande. Man kan även pasera num som är antalet grafer som ska genereras. Det blir då num antal grafer som sparas i objektet. 
+
+## Creating a network structure
+
+
+```{r}
+arc.set <- matrix(c("A", "C", "B", "F", "C", "F"),
+            ncol = 2, byrow = TRUE,
+            dimnames = list(NULL, c("from", "to")))
+
+arc.set
+```
+
+
+```{r}
+
+arcs(e) <- arc.set
+plot(e)
+```
+
+För att skapa en struktur som är given, så behöver man skapa en matris med två kolumner en "from" och "to" och sedan i acrs() ange den graf du vill ändra på och assigna funktionsanropet med matrisen. From A to B blir då en pil A->B i grafen.
+
+Om du skulle råka göra fel och ange en nod som t.ex "X" som inte finns i den specificerade grafen i "from" eller "to" så kommer den säga ifrån och ge dig ett felmeddelande i stil med nedan.
+
+"## Error: node(s) 'X' 'W' 'Y' 'Z' not present in the graph. "
+
+En graf ska INTE ha några cykliska beroenden då det blir en "hönan eller ägget" fråga då man inte vet vad som beror på vad utan enbart kan beskriva förhållandet mellan dessa variabler. För att få en bild av vad en cyklisk graf är så är det typ A -> B -> C - > A. 
+
+Kolla det funkar inte. 
+
+```{r, eval = FALSE}
+loops <- matrix(c("A", "A", "B", "B", "C", "D"),
+           ncol = 2, byrow = TRUE,
+           dimnames = list(NULL, c("from", "to")))
+
+arcs(e) <- loops
+
+"Error in check.arcs(value, nodes = names(x$nodes)) : invalid arcs that are actually loops: A -> A B -> B
+"
+```
+
+Vad var det jag sa. 
+
+Vid oklara förhållanden vi vet inte om det är A som ger B eller om B som ger A. Istället så introducerar vi en undirected arc vilket är helt ok. 
+
+```{r}
+edges = matrix(c("A", "B", "B", "A", "C", "D"),
+          ncol = 2, byrow = TRUE,
+           dimnames = list(NULL, c("from", "to")))
+ edges
+ 
+ plot(e)
+ arcs(e) <- edges
+ plot(e)
+```
+
+Vi specificerade alltså A -> B och B <- A vilket gör att det är directions. Men vi tog bort några så ja vi ändrade grafen helt. 
+
+Går även att speca directions med matriser. 
+
+```{r}
+e_mat <- empty.graph(LETTERS[1:6], num = 1)
+
+adj = matrix(0L, ncol = 6, nrow = 6,
+         dimnames = list(LETTERS[1:6], LETTERS[1:6]))
+ adj["A", "C"] = 1L
+ adj["B", "F"] = 1L
+ adj["C", "F"] = 1L
+ adj["D", "E"] = 1L
+ adj["A", "F"] = 1L
+ adj["A", "E"] = 1L
+ adj
+ 
+ 
+```
+
+The rows are "from" and the columns are "to"
+
+```{r}
+plot(e_mat)
+ 
+ amat(e_mat) <- adj 
+ 
+ plot(e_mat)
+
+```
+
+
+
+Ta da!
+
+```{r}
+e2 <- model2network("[A][C][B|A][D|C][F|A:B:C][E|F]")
+
+modelstring(e2) = "[A][C][B|A][D|C][F|A:B:C][E|F]"
+plot(e2)
+
+```
+
+Two ways to specify it via text. Just read of the independencies.
+
+
+
+```{r}
+random.graph(LETTERS[1:6], prob = 0.1)
+```
+
+# Graph Utilities 
+
+```{r}
+
+plot(e)
+plot(e2)
+
+cat("acyclic checks wether the graph is directed, TRUE if directed, \n
+    FALSE if the graph is cyclic i.e A->B->C->A")
+acyclic(e)
+
+cat("directed() checks if the graph is completly directed, in the first case it is not since we have a arc betwen nodes that is undirected. i.e A - B")
+directed(e)
+directed(e2) #This one dosn't have any undirected arcs.
+
+cat("Checks if there is a path between two nodes. Note for undirected graphs it dosn't matter which from and to is. This is not true for directed graphs. This means that you have to go  from -> to  if you want the function to return TRUE in the other case from <- to it will be g")
+path(e, from = "A", to =  "B")
+path(e, from = "B", to =  "A")
+path(e, from = "D", to =  "C")
+path(e, from = "C", to =  "D")
+
+cat("SKELETON")
+e3 <- skeleton(e2)
+
+plot(e3)
+
+
+# pdag2dag(e, ordering = matrix(c("A", "B", "B", "F", "F", "E","F","D"),
+#           ncol = 2, byrow = TRUE,
+#            dimnames = list(NULL, c("from", "to"))))
+
+e_sub<- subgraph(e, nodes = c("A","B")) #Subset nodes and builds a new one.
+plot(e_sub)
+```
+
+# Scoring 
+
+```{r}
+learn.net <- empty.graph(names(learning.test)) 
+
+modelstring(learn.net) = "[A][C][F][B|A][D|A:C][E|B:F]"
+
+
+score(learn.net, data = learning.test, type = "bic")
+
+```
+
+
+First we create a empty network with nodes A-F afterwards with modelstring we specify the model (without struckture learning). Afterwards we get the BIC-score with the score function. All parts of the data has to match, columnnames as well. So you can't skip one coulmn and/or have another column which has name different to the bayesian nets nodes in the data arg.
+
+```{r}
+gauss.net = empty.graph(names(gaussian.test))
+modelstring(gauss.net) = "[A][B][E][G][C|A:B][D|B][F|A:D:E:G]"
+gauss.net
+
+eq.net = set.arc(gauss.net, "D", "B")
+score(gauss.net, gaussian.test, type = "bic-g")
+score(eq.net, gaussian.test, type = "bic-g")
+
+all.equal(cpdag(gauss.net), cpdag(eq.net))
+```
+
+gauss.net are two nets with only one difference, we change the direction between B and C. Since neither B or C is unshilded colliders (ie dont have two parents that are directly connected.) they are equivalent which here is displayed in the all.equal(cpdag(gauss.net), cpdag(eq.net)) output. You could also show and compare the vstructs which is close to same but it displays all unshilded colliders.
+
+
+```{r}
+a <- choose.direction(gauss.net, data = gaussian.test, c("B", "D"),
+   criterion = "bic-g", debug= TRUE)
+
+arcs(gauss.net) <- a$arcs
+```
+
+Is convinient to select the right path, but it is also possible to do it manualy with coose.direction and then use arcs to fix the setting. 
+
+
+# Structure learning
+
+```{r}
+data <- asia
+
+# Learn the structure of the network, instead of specifying it as in previous examples.
+graph <- hc(data, score="bde")
+
+# Here we compute the parameters, ie the conditional tables given the structure.
+bayes_net <- bn.fit(graph, data, method="bayes", iss=1)
+
+# Here we converte it to a grain object, so we can do some exact inference.
+junction_tree <- compile(as.grain(bayes_net))
+```
+
+# Approximate inference
+
+```{r}
+
+#Aproximate inference for B with no evidence 
+dist <- cpdist(fitted=bayes_net, nodes=c("B"), evidence=TRUE)
+prop.table(table(dist))
+
+# aprox inf. for B w. no evidence but another method
+dist <- cpdist(fitted=bayes_net, nodes=c("B"), evidence=TRUE, method="lw")
+prop.table(table(dist))
+
+# aprox inf. for L and T w/o any evidence (observations)
+dist <- cpdist(fitted=bayes_net, nodes=c("L", "T"), evidence=TRUE)
+prop.table(table(dist))
+
+# aprox inf. for L and T with having node E observed as yes
+dist <- cpdist(fitted=bayes_net, nodes=c("L", "T"), evidence=(E == "yes"))
+prop.table(table(dist))
+
+# aprox inf. for D given that we have observed B as yes and E as yes. 
+# We have also increased the number of samples generated.
+dist <- cpdist(bayes_net, nodes="D", evidence=(B=="yes") & (E=="yes"), n=10^6)
+prop.table(table(dist))
+
+dist <- cpdist(bayes_net, nodes="D", evidence=(B=="yes") & (E=="no"))
+prop.table(table(dist))
+
+dist <- cpdist(bayes_net, nodes="D", evidence=(B=="no") & (E=="yes"), n=10^6)
+prop.table(table(dist))
+
+dist <- cpdist(bayes_net, nodes="D", evidence=(B=="no") & (E=="no"))
+prop.table(table(dist))
+```
+
+
+```{r}
+
+## Exact inference
+querygrain(junction_tree, nodes=c("B"), type="marginal")
+querygrain(junction_tree, nodes=c("B"), type="joint")
+querygrain(junction_tree, nodes=c("B"), type="conditional")
+
+
+## Exact inference
+querygrain(junction_tree, nodes=c("L", "T"), type="marginal")
+querygrain(junction_tree, nodes=c("L", "T"), type="joint")
+querygrain(junction_tree, nodes=c("L", "T"), type="conditional")
+
+
+
+## Exact Inference
+querygrain(setEvidence(junction_tree, nodes="E", states="yes"),
+           nodes=c("L", "T"), type="joint")
+
+querygrain(setEvidence(junction_tree, nodes="E", states="yes"),
+           nodes=c("L", "T"), type="marginal")
+
+querygrain(setEvidence(junction_tree, nodes="E", states="yes"),
+           nodes=c("L", "T"), type="conditional")
+
+## Exact Inference
+querygrain(junction_tree, nodes=c("D", "B", "E"), type="conditional")
+
+
+
+
+
+```
+
