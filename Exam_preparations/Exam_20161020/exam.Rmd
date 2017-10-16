@@ -42,15 +42,14 @@ a
 ## b)
 
 ```{r}
-nographs <- 100
+nographs <- round(29281)
 
 many.graphs <- random.graph(LETTERS[1:5], num = nographs)
 
 moral.graphs <- lapply(many.graphs,moral)
 skel.graphs <- lapply(moral.graphs, FUN = skeleton)
 
-all.equal(skel.graphs,moral.graphs)
-
+mean(skel.graphs %in%  moral.graphs)
 ```
 
 ## c)
@@ -150,6 +149,11 @@ hidden_states <- paste0("z",rep(1:5,each=2))
 observed_states <- paste0("x",rep(1:5, each = 2))
 
 robot <- initHMM(hidden_states,observed_states,start,new_trans,new_em)
+
+```
+
+
+```{r}
 
 ```
 
