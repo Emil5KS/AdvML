@@ -1,0 +1,211 @@
+---
+title: "lab1_exam"
+author: "Emil K Svensson"
+date: "16 October 2017"
+output: pdf_document
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(collapse = TRUE, comment = "#>")
+knitr::opts_chunk$set(fig.pos='H', fig.align='center')
+```
+
+
+```{r, echo=FALSE}
+library(bnlearn)
+library(gRain)
+library(Rgraphviz)
+
+## install.packages("bnlearn")
+## source("https://bioconductor.org/biocLite.R")
+## biocLite("RBGL")
+## install.packages("gRain")
+## source("https://bioconductor.org/biocLite.R")
+## biocLite("Rgraphviz")
+```
+
+# Assignment 1
+
+```{r, echo=FALSE, cache=TRUE}
+true_net <- empty.graph(names(learning.test))
+modelstring(true_net) = "[A][C][F][B|A][D|A:C][E|B:F]"
+```
+
+```{r}
+graph_equality <- function(g1, g2) {
+    all.equal(cpdag(g1), cpdag(g2)) == TRUE
+}
+
+print("No restarts")
+sapply(1:5, function(i) {
+    g1 <- hc(alarm, score="bde", iss=1, restart=0)
+    g2 <- hc(alarm, score="bde", iss=1, restart=0)
+    graph_equality(g1, g2)
+})
+
+print("Restarts with equivalent seed")
+sapply(1:5, function(i) {
+    set.seed(i)
+    g1 <- hc(alarm, score="bde", iss=1, restart=10)
+    set.seed(i)
+    g2 <- hc(alarm, score="bde", iss=1, restart=10)
+    graph_equality(g1, g2)
+})
+
+print("Restarts with distinct seed")
+sapply(1:5, function(i) {
+    set.seed(i)
+    g1 <- hc(alarm, score="bde", iss=1, restart=10)
+    set.seed(2 * i)
+    g2 <- hc(alarm, score="bde", iss=1, restart=10)
+    graph_equality(g1, g2)
+})
+```
+
+The hill climbing algorithm is completely deterministic so unless we do random restarts the result is the same. The random restarts means that we begin the algorithm with different initial graph structures which may possibly end up in different local optima.
+
+\newpage
+
+# Assignment 2
+
+```{r, cache=TRUE}
+data <- asia
+
+g1 <- hc(data, score="bde", iss=1, restart=10)
+g10 <- hc(data, score="bde", iss=10, restart=10)
+g100 <- hc(data, score="bde", iss=100, restart=10)
+g1000 <- hc(data, score="bde", iss=1000, restart=10)
+
+bnlearn::score(g1, data, type="bde")
+bnlearn::score(g10, data, type="bde")
+bnlearn::score(g100, data, type="bde")
+bnlearn::score(g1000, data, type="bde")
+```
+
+In the BDe (\textit{Bayesian Dirichlet equivalent uniform}) score we assume a priori that the probabilities follow a Dirichlet($\alpha$) where $\alpha$ is the \textit{imaginary sample size} (iss) and the posterior
+
+\begin{equation*}
+P(A | Data) = \frac{iss}{n + iss} P_{\text{prior}}(A) + \frac{n}{n + iss} P_{\text{empirical}}(A),
+\end{equation*}
+
+where $n$ is the number of observations in the data. This means that the iss controls how certain we are a priori of the probabilities indicating that having a high iss means the data have less influence on the posterior distribution. Since the Dirichlet is chosen such that it is uniform a higher iss result in more edges in the graph, therefore iss can be seen as a regularization term. A low value entails a sparse graph, i.e. less arcs/dependencies, inferred from data assuming the true distribution is represented by a sparse graph.
+
+This can clearly be shown by the plot below. Given that there are 8 nodes in the graph we would expect the average branching factor to be around $7 / 2 = 3.5$  with a uniform prior and we get $3$ with a imaginary sample size of 1000 which is close. Bayesian networks have certain constraints that prevent edges from being added arbitrarly.
+
+```{r, echo=FALSE}
+oldpar <- par(mfrow=c(2, 1))
+graphviz.plot(g1, main="iss=1")
+graphviz.plot(g1000, main="iss=1000")
+par(oldpar)
+```
+
+\newpage
+
+# Assignment 3
+
+```{r}
+data <- asia
+graph <- hc(data, score="bde", iss=1, restart=10)
+bayes_net <- bn.fit(graph, data, method="bayes", iss=1)
+junction_tree <- compile(as.grain(bayes_net))
+```
+
+```{r, echo=FALSE}
+plot(junction_tree)
+```
+
+## Aproximate inference
+```{r}
+#Aproximate inference for B with no evidence 
+dist <- cpdist(fitted=bayes_net, nodes=c("B"), evidence=TRUE)
+prop.table(table(dist))
+
+# aprox inf. for B w. no evidence but another method
+dist <- cpdist(fitted=bayes_net, nodes=c("B"), evidence=TRUE, method="lw")
+prop.table(table(dist))
+
+# aprox inf. for L and T w/o any evidence (observations)
+dist <- cpdist(fitted=bayes_net, nodes=c("L", "T"), evidence=TRUE)
+prop.table(table(dist))
+
+# aprox inf. for L and T with having node E observed as yes
+dist <- cpdist(fitted=bayes_net, nodes=c("L", "T"), evidence=(E == "yes"))
+prop.table(table(dist))
+
+# aprox inf. for D given that we have observed B as yes and E as yes. 
+# We have also increased the number of samples generated.
+dist <- cpdist(bayes_net, nodes="D", evidence=(B=="yes") & (E=="yes"), n=10^6)
+prop.table(table(dist))
+
+dist <- cpdist(bayes_net, nodes="D", evidence=(B=="yes") & (E=="no"))
+prop.table(table(dist))
+
+dist <- cpdist(bayes_net, nodes="D", evidence=(B=="no") & (E=="yes"), n=10^6)
+prop.table(table(dist))
+
+dist <- cpdist(bayes_net, nodes="D", evidence=(B=="no") & (E=="no"))
+prop.table(table(dist))
+```
+
+## Exact inference
+
+```{r}
+## Exact inference
+querygrain(junction_tree, nodes=c("B"), type="marginal")
+querygrain(junction_tree, nodes=c("B"), type="joint")
+#querygrain(junction_tree, nodes=c("B"), type="conditional")
+
+
+## Exact inference
+querygrain(junction_tree, nodes=c("L", "T"), type="marginal")
+querygrain(junction_tree, nodes=c("L", "T"), type="joint")
+querygrain(junction_tree, nodes=c("L", "T"), type="conditional")
+
+
+
+## Exact Inference
+querygrain(setEvidence(junction_tree, nodes="E", states="yes"),
+           nodes=c("L", "T"), type="joint")
+
+querygrain(setEvidence(junction_tree, nodes="E", states="yes"),
+           nodes=c("L", "T"), type="marginal")
+
+querygrain(setEvidence(junction_tree, nodes="E", states="yes"),
+           nodes=c("L", "T"), type="conditional")
+
+## Exact Inference
+querygrain(junction_tree, nodes=c("D", "B", "E"), type="conditional")
+
+```
+
+
+In the approximate inference methods we use simulated data to infer the queries and the samples are random so the inference will also be random. When the query includes observed nodes it seems that the approximate inference algorithm require more samples to be reasonably accurate than for queries without any observed nodes. This is probabily due to the sampling process is sampling from the full joint distribution rather than the conditional distribution. This means that not all samples fullfil the conditional so the actual sample size is far less than specified. This is evident from the following code block.
+
+```{r}
+## No observed nodes
+number_of_samples <- 10^6
+dist <- cpdist(bayes_net, nodes="D", evidence=TRUE, n=number_of_samples)
+number_of_actual_samples <- nrow(dist)
+sprintf("Number of samples to generate: %i, Number of samples returned: %i",
+        number_of_samples, number_of_actual_samples)
+
+## Two observed nodes
+number_of_samples <- 10^6
+dist <- cpdist(bayes_net, nodes="D", evidence=(B=="no") & (E=="yes"), n=number_of_samples)
+number_of_actual_samples <- nrow(dist)
+sprintf("Number of samples to generate: %i, Number of samples returned: %i",
+        number_of_samples, number_of_actual_samples)
+```
+
+\newpage
+
+# Assignment 4
+
+```{r, cache=TRUE}
+n <- 10000
+rgraphs <- unique(random.graph(nodes=c("1", "2", "3", "4", "5"), num=n,
+                               method="ic-dag", burn.in=500, every=10))
+length(unique(lapply(rgraphs, cpdag))) / length(rgraphs)
+```
+
+From the evidence we would reduce the search space by approximately 45\% which is a lot relative to how many DAGs there are as the number of nodes increases. However, I imagine it is more difficult to work with the essential graphs due to containing both directed and undirected arcs. Depending on the increased complexity of the algorithm working in the essential graph space could potentially be appropriate for structure learning.

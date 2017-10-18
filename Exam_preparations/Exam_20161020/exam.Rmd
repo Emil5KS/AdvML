@@ -1,159 +1,433 @@
 ---
-title: "Exam 2016-10-20, emisv463"
-author: "Emil K Svensson"
+title: "Exam 2016-10-20, unknown_id"
+author: "Ano Nym"
 date: "16 October 2017"
 output: html_document
 ---
 
 ```{r setup, include=FALSE}
 knitr::opts_chunk$set(echo = TRUE)
-library(bnlearn)
-library(gRain)
 ```
+
+
+# Question 1
 
 ## a)
 
 ```{r}
+library(bnlearn)
+library(gRain)
+
 data <- asia 
 
+bn_struct <- hc(asia)
 
-# Learned with Hill Climbing algorithm
-learned_graph <- hc(asia)
+plot(bn_struct)
 
-# Aproximated
-bayes_net <- bn.fit(learned_graph, data = data)
+# Aproximate
+bayes_net <- bn.fit(bn_struct, data = data)
 
-dist <- cpdist(fitted=bayes_net, nodes=c("A"), 
-               evidence=(X == "yes") & (B == "yes"))
-cat("The aproximated probability of that person visiting Asia: \n")
+dist <- cpdist(bayes_net, nodes="A", evidence=(X=="yes") & (B=="yes"))
 prop.table(table(dist))
 
-# Exact (Lautrizen Spiegelhalter)
+```
+The probability of the patient not been in asia is a bit above 99 %. As seen in the plot above the Asia factor is not connected to any of the other nodes so infering other evidence in to this model does not change the outcome of this probability. But since this is an aproximation it will vary a bit out of pure randomness but also depending on number samples we draw from the full conditional. 
+
+
+```{r}
+# Exact
 junction_tree <- compile(as.grain(bayes_net))
 
-cat("The exact probability of that person visiting Asia: \n")
-a<- querygrain(junction_tree, nodes=c("A", "X", "B"), type="conditional")
-
-
-a
-
+my_evid <-setEvidence(junction_tree, nodes=c("X","B"), states=c("yes","yes"))
+querygrain(my_evid, nodes=c("A"), type="joint")
 ```
+
+The exact probabilities are also a bit above 99 % 
 
 ## b)
 
 ```{r}
-nographs <- round(29281)
+no_graphs <- 100
+many_graphs <- random.graph(LETTERS[1:5], num  = no_graphs)
 
-many.graphs <- random.graph(LETTERS[1:5], num = nographs)
 
-moral.graphs <- lapply(many.graphs,moral)
-skel.graphs <- lapply(moral.graphs, FUN = skeleton)
+moral_graphs <- lapply(many_graphs, FUN = moral)
+mn_skeletons <- lapply(many_graphs, FUN = skeleton)
 
-mean(skel.graphs %in%  moral.graphs)
+mean(moral_graphs %in% mn_skeletons) 
+
+
+truth_v <-c()
+
+for (i in 1:no_graphs){
+  
+ truth_v[i] <- all.equal(moral_graphs[[i]],mn_skeletons[[i]]) == "TRUE"
+}
+
+mean(truth_v)
+
 ```
 
 ## c)
 
 
 
-## 2
+
+# Question 2 
 
 ```{r}
-states <- paste("z",1:10,sep = "")
-symbols <- paste("s",1:11,sep = "")
+hidden_states <- paste("z",1:10,sep = "")
+observed_states <- paste("x",1:11,sep = "")
 start <- rep(0.1,10)
-
-#Just to see the structure
-#initHMM(states, symbols)
 
 # The transition probabilities, since we only can move 
 trans <- matrix(0,ncol = 10, nrow = 10)
 diag(trans) <- 0.5
 diag(trans[,-1]) <- 0.5
 trans[10,1] <- 0.5
-#trans[1,10] <- 0.5
+#trans[,11] <- rep(0.5)
 
 # Making sure the probabilities sum to 1 in each row
-#apply(trans, MARGIN = 1, FUN = sum)
+apply(trans, MARGIN = 1, FUN = sum)
+rep(1:5, each = 2)
 
-emission <- matrix(0,ncol = 11, nrow = 10)
-diag(emission) <- 0.5
+# The Emission probabilities are our uncertaintiec in the position of the robot. Basicly the observations that we cannot observe. 
 
-# The Emission probabilities are our uncertaintiec in the position of the robot.
+emission <- 
+  diag(1/10, 10)[, c(3:10, 1:2)] +
+  diag(1/10, 10)[, c(2:10, 1)] +
+  diag(1/10, 10) + 
+  diag(1/10, 10)[, c(10, 1:9)] + 
+  diag(1/10, 10)[, c(9:10, 1:8)]
 
-# Brute force set up, Nick, Rasmus and Sascha probably has a nicer ways of solving this 
-diag(emission) <- 0.1
-diag(emission[,-1]) <- 0.1 
-diag(emission[-1,]) <- 0.1 
-diag(emission[c(-1:-2),]) <- 0.1
-diag(emission[,c(-1:-2)]) <- 0.1 
-emission[10,2] <- 0.1
-emission[2,10] <- 0.1
-emission[2,10] <- 0.1
-emission[1,10] <- 0.1
-emission[9:10,1] <- 0.1
-emission[1,9] <- 0.1
+emission <- cbind(emission, c(rep(0.5, 10)))
 
 
-emission[,11] <- rep(0.5, times = 10)
-#trans[,11] <- rep(0,10)
+colnames(emission) <- paste("x",1:11,sep = "")
+rownames(emission) <- paste("z",1:10,sep = "")
 
-emission
-trans
+rownames(trans) <- paste("z",1:10,sep = "")
+colnames(trans) <- paste("z",1:10,sep = "")
 ```
 
 ```{r}
-robot <- initHMM(states,symbols,start,trans,emission)
-```
+library(HMM)
 
-```{r}
-
-
-new_em <- diag(0, nrow = 5, ncol = 10 )
-#diag(new_em[,-1]) <- rep(0.5, 4)
-#new_em[5,1] <- 0.5
+robot <- initHMM(States = hidden_states,
+                 Symbols = observed_states,
+                 startProbs = start,
+                 transProbs = trans,
+                 emissionProbs = emission)
 
 
-new_em[,c(1)]<- c(0.5,0,0,0,0.5)
-new_em[,c(2)]<- c(0.5,0.5,0,0,0)
-new_em[,c(3)]<- c(0,0.5,0.5,0,0)
-new_em[,c(4)]<- c(0,0,0.5,0.5,0)
-new_em[,c(5)]<- c(0,0,0,0.5,0.5)
-
-new_em <- new_em[c(1,1,2,2,3,3,4,4,5,5),c(1,1,2,2,3,3,4,4,5,5)]
-
-new_em
-colnames(new_em) <- paste0("x",c(1,1,2,2,3,3,4,4,5,5))
-rownames(new_em) <- paste0("z",c(1,1,2,2,3,3,4,4,5,5))
-
-new_trans <- diag(0,ncol = 5, nrow = 5)
-new_trans
-
-new_trans[1,c(5,1,2)] <- c(0.333,0.3333,0.3333)
-new_trans[2,c(1,2,3)] <- c(0.333,0.3333,0.3333)
-new_trans[3,c(2,3,4)] <- c(0.333,0.3333,0.3333)
-new_trans[4,c(3,4,5)] <- c(0.333,0.3333,0.3333)
-new_trans[5,c(4,5,1)] <- c(0.333,0.3333,0.3333)
-new_trans
-
-new_trans <- new_trans[c(1,1,2,2,3,3,4,4,5,5),c(1,1,2,2,3,3,4,4,5,5)]
-
-colnames(new_trans) <- paste0("z",c(1,1,2,2,3,3,4,4,5,5))
-rownames(new_trans) <- paste0("z",c(1,1,2,2,3,3,4,4,5,5))
-new_trans
-```
-
-```{r}
-
-hidden_states <- paste0("z",rep(1:5,each=2))
-observed_states <- paste0("x",rep(1:5, each = 2))
-
-robot <- initHMM(hidden_states,observed_states,start,new_trans,new_em)
 
 ```
 
 
+## b) 
+
 ```{r}
 
+
+emission_sates2 <- paste("x",rep(1:5,each = 2),sep = "", c("a","b"))
+hidden_states2 <- paste("z",rep(1:5,each = 2),sep = "", c("a","b"))
+starting_probabilities <- rep(0.1,10)
+
+
+t2 <- matrix(0, ncol = 10, nrow = 10)
+diag(t2) <- 0.5
+diag(t2[,-1]) <- 0.5
+t2[10,1] <- 0.5 
+
+t2
+
+diag(t2[c(1,3,5,7,9),c(1,3,5,7,9)]) <- 0
+diag(t2[c(1,3,5,7,9), c(1,3,5,7,9)+1]) <- 1
+
+t2
+
+em_2 <- 
+  diag(1/6, 10)[, c(3:10, 1:2)] +
+  diag(1/6, 10)[, c(2:10, 1)] +
+  diag(1/6, 10) + 
+  diag(1/6, 10)[, c(10, 1:9)] + 
+  diag(1/6, 10)[, c(9:10, 1:8)]
+
+
+
+
+
+colnames(em_2) <- paste("x",rep(1:5,each = 2),sep = "", c("a","b"))
+rownames(em_2) <- paste("z",rep(1:5,each = 2),sep = "", c("a","b"))
+
+
+colnames(t2) <- paste("z",rep(1:5,each = 2),sep = "", c("a","b"))
+rownames(t2) <- paste("z",rep(1:5,each = 2),sep = "", c("a","b"))
+
+
+
+
+```
+
+```{r}
+second_robot <- initHMM(States = hidden_states2, 
+        Symbols = emission_sates2, 
+        startProbs = starting_probabilities,
+        transProbs = t2,
+        emissionProbs = em_2)
+```
+
+
+## c) 
+
+The parameters of the HMM is the transition probabilities and the emission probabilities, to get these we use expectation maximitaion algorithm with the forward-backward algorithm in the expectation step and then in the M step maximizes using the parameters to updated values (that depends on the previous ones). In the FB algorithm we have two steps forward and backward. In forward we itterate forward trough the observations and and given the probabilites of the past state and previous alpha we update our belifes. In the backward we itterate backwards, knowing all the observations and given the coming observation update our beta parameter. 
+
+
+# 3) 
+
+
+```{r}
+# Squared exponential kernel
+k1 <- function(sigmaf = 1, ell = 1)  
+{   
+	rval <- function(x, y = NULL) 
+    {       
+		r = sqrt(crossprod(x-y))       
+		return(sigmaf^2*exp(-r^2/(2*ell^2)))     
+	}   
+    class(rval) <- "kernel"   
+    return(rval) 
+}
+
+
+k2 <- function(sigmaf = 1, ell = 1, alpha = 1)  
+{   
+	rval <- function(x, y = NULL) 
+	{     r = sqrt(crossprod(x-y))     
+		  return(sigmaf^2*(1+r^2/(2*alpha*ell^2))^-alpha)   
+	}   
+	class(rval) <- "kernel"   
+	return(rval) 
+} 
+
+
+k3 <- function(sigmaf = 1, ell = 1)  
+{   
+	rval <- function(x, y = NULL) 
+	{	r = sqrt(crossprod(x-y))
+		 return(sigmaf^2*(1+sqrt(3)*r/ell)*exp(-sqrt(3)*r/ell))   
+	}   
+	class(rval) <- "kernel"   
+	return(rval) 
+} 
+
+
+library(kernlab)
+
+
+```
+
+
+
+```{r}
+
+r<-seq(0,4,by=0.01)
+
+kk1 <- k1()
+kd1 <- kernelMatrix(kk1,x = r)
+
+kk2_a05 <- k2(alpha = 1/2)
+kd2_a05 <- kernelMatrix(kk2_a05,x = r)
+
+kk2_a2 <- k2(alpha = 2)
+kd2_a2 <- kernelMatrix(kk2_a2,x = r)
+
+kk2_a20 <- k2(alpha = 20)
+kd2_a20 <- kernelMatrix(kk2_a20,x = r)
+
+kk3 <- k3()
+kd3 <- kernelMatrix(kk3,x = r)
+
+
+
+```
+
+
+```{r}
+plot(kd1[1,], type = "l", col = "black")
+lines(kd2_a05[1,], col = "orange")
+lines(kd2_a2[1,], col = "green")
+lines(kd2_a20[1,], col = "red")
+lines(kd3[1,], col =  "blue ")
+```
+
+The alpha parameter could be considerd a precision parameter where lower alpha would imply lower precision and vice versa.
+
+## b) 
+
+
+```{r}
+
+load("GPdata.RData")
+
+sigma_2n <- 0.5^2
+
+gp_k1 <- gausspr(x = x, y = y, 
+                       kernel = kk1,
+                       var = sigma_2n)
+
+gp_k3 <- gausspr(x = x, y = y, 
+                       kernel = kk3,
+                       var = sigma_2n)
+
+
+```
+
+
+
+```{r}
+ggplot() + 
+  
+   geom_point(
+     aes(x = x, y = y),
+     col = "black",
+     alpha = 0.7) + 
+  
+  geom_line(
+    aes(x = x, y = predict(gp_k1)), 
+    alpha = 1,
+    col = "red") +
+   
+  geom_line(
+    aes(x = x, y = predict(gp_k3)), 
+    alpha = 1,
+    col = "blue") +
+  
+
+   theme_classic()
+```
+
+
+
+```{r}
+
+predbands <-function(kkk){
+
+X_star <- x#seq(range(x)[1],range(x)[2], length.out = length(x))
+K_ss <- kernelMatrix(kkk,  X_star, X_star)
+K_so <- kernelMatrix(kkk,X_star,x)
+K_os <- kernelMatrix(kkk,x,X_star)
+K_oo <- kernelMatrix(kkk,x,x)
+dim(K_oo)
+kovarians <- K_ss - K_so %*% solve( K_oo + sigma_2n*diag(1,ncol=100, nrow = 100)) %*% K_os
+
+ 
+return(1.96 * sqrt(diag(kovarians)))
+
+}
+
+
+pred_kk1 <- predbands(kk1)
+pred_kk2 <- predbands(kk3)
+
+```
+
+
+```{r}
+predbandsA <-function(kkk,noise){
+
+X_star <- x#seq(range(x)[1],range(x)[2], length.out = length(x))
+K_ss <- kernelMatrix(kkk,  X_star, X_star)
+K_so <- kernelMatrix(kkk,X_star,x)
+K_os <- kernelMatrix(kkk,x,X_star)
+K_oo <- kernelMatrix(kkk,x,x)
+dim(K_oo)
+kovarians <- K_ss - K_so %*% solve( K_oo + sigma_2n*diag(1,ncol=100, nrow = 100)) %*% K_os + noise
+
+ 
+return(1.96 * sqrt(diag(kovarians)))
+
+}
+
+
+pred_kk1A <- predbandsA(kk1,sigma_2n)
+pred_kk2A <- predbandsA(kk3,sigma_2n)
+```
+
+
+
+```{r}
+plot(x,y)
+lines(x,predict(gp_k1))
+lines(x,predict(gp_k1) + pred_kk1, col = "blue")
+lines(x,predict(gp_k1) - pred_kk1, col = "blue")
+lines(x,predict(gp_k1) + pred_kk1A, col = "red")
+lines(x,predict(gp_k1) - pred_kk1A, col = "red")
+```
+
+```{r}
+plot(x,y)
+lines(x,predict(gp_k3))
+lines(x,predict(gp_k3) + pred_kk2, col = "blue")
+lines(x,predict(gp_k3) - pred_kk2, col = "blue")
+lines(x,predict(gp_k3) + pred_kk2A, col = "red")
+lines(x,predict(gp_k3) - pred_kk2A, col = "red")
+```
+
+
+
+
+
+
+## Extra task from Jose.
+
+```{r}
+library(HMM)
+
+states <- c("sun1","sun2","rain1","rain2")
+hidden_states <- paste(rep(c("zSun","zRain"),each = 2),rep(1:2,times =2), sep = "")
+start_probabilities <- c(0.5,0,0.5,0)
+
+# transition <- matrix(0, ncol = 4, nrow = 4)
+# diag(transition)  <- rep(c(0.25,0.75), times = 2)
+# transition[1,]    <- rep(0.25, times = 4)
+# transition[2,]    <- c(0,0.75,0.125, 0.125)
+# transition[3,]    <- rep(0.25, times = 4)
+# transition[4,1:2] <- c(0.125,0.125) 
+# transition
+
+
+tp <- matrix(0, ncol = 4, nrow = 4)
+tp[1,] <- c(0,0.5,0.5,0)
+tp[2,] <- c(0,0.75,0.25,0)
+tp[3,] <- c(0.5,0,0,0.5)
+tp[4,] <- c(0.25,0,0,0.75)
+tp
+
+# emission <- matrix(0, ncol = 5, nrow = 4) 
+# emission[1,] <- c(0.9,0,0,0,0.1)
+# emission[2,] <- c(0,0.9,0,0,0.1)
+# emission[3,] <- c(0,0,0.9,0,0.1)
+# emission[4,] <- c(0,0,0,0.9,0.1)
+# emission
+
+
+em <- matrix(0, ncol = 4, nrow = 4 )
+diag(em) <- rep(0.9, 4)
+em[1,3] <- 0.1 
+em[2,3] <- 0.1 
+em[3,1] <- 0.1 
+em[4,1] <- 0.1 
+em
+
+
+weatherBot <- initHMM(States  = hidden_states,
+                              Symbols = states,
+                              startProbs = start_probabilities,
+                              transProbs = tp,
+                              emissionProbs = em)
+
+set.seed(12345)
+simHMM(weatherBot,10)
 ```
 

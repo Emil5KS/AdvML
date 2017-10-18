@@ -1,0 +1,33 @@
+# Squared exponential kernel
+k1 <- function(sigmaf = 1, ell = 1)  
+{   
+	rval <- function(x, y = NULL) 
+    {       
+		r = sqrt(crossprod(x-y))       
+		return(sigmaf^2*exp(-r^2/(2*ell^2)))     
+	}   
+    class(rval) <- "kernel"   
+    return(rval) 
+}
+
+
+k2 <- function(sigmaf = 1, ell = 1, alpha = 1)  
+{   
+	rval <- function(x, y = NULL) 
+	{     r = sqrt(crossprod(x-y))     
+		  return(sigmaf^2*(1+r^2/(2*alpha*ell^2))^-alpha)   
+	}   
+	class(rval) <- "kernel"   
+	return(rval) 
+} 
+
+
+k3 <- function(sigmaf = 1, ell = 1)  
+{   
+	rval <- function(x, y = NULL) 
+	{	r = sqrt(crossprod(x-y))
+		 return(sigmaf^2*(1+sqrt(3)*r/ell)*exp(-sqrt(3)*r/ell))   
+	}   
+	class(rval) <- "kernel"   
+	return(rval) 
+} 

@@ -149,6 +149,8 @@ repeter <- function(x,y,xs,sn,hyperParam,kernel){
 
 res <- linear_gp(x,y,xs,hyperParam,sn,kernel)
 
+# If you want the prediction band just add the noise variance (ie the sigma_n)
+
 upp <- res$fbar + 1.96*sqrt(diag(res$vf))
 low <- res$fbar - 1.96*sqrt(diag(res$vf))
 
@@ -468,7 +470,7 @@ gridPoints <- data.frame(gridPoints)
 names(gridPoints) <- c("varWave","skewWave")
 probPreds <- predict(GPfitFraud, gridPoints, type="probabilities")
 
-contour(x1,x2,matrix(probPreds[,1],100), 20, 
+contour(x1,x2,t(matrix(probPreds[,1],100)), 20, 
         xlab = "varWave", ylab = "skewWave", 
         main = 'Prob(Fraud) - Fraud is red')
 
